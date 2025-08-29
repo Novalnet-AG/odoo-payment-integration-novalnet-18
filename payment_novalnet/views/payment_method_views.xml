@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="payment_method_form_novalnet_inherit" model="ir.ui.view">
+        <field name="name">payment.method.form.novalnet.inherit</field>
+        <field name="model">payment.method</field>
+        <field name="inherit_id" ref="payment.payment_method_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='support_tokenization']" position="attributes">
+                <attribute name="invisible">code == 'novalnet'</attribute>
+            </xpath>
+            <xpath expr="//field[@name='support_express_checkout']" position="attributes">
+                <attribute name="invisible">code == 'novalnet'</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

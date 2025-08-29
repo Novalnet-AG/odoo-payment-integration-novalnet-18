@@ -1,0 +1,476 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="novalnet_redirect_failure" name="Novalnet Failure">
+      <script type="text/javascript">
+          alert("<t t-esc='failure_message'/>");
+          window.location.href = '/shop/payment';
+      </script>
+  </template>
+
+        <template id="novalnet_sale_order_portal_content" name="novalnet inherit sale portal" inherit_id="sale.sale_order_portal_content">
+            <xpath expr="//*[@id='terms']" position="before">
+              <t t-if="sale_order.transaction_ids">
+                <t t-set="payment_tx_id" t-value="sale_order.get_portal_last_transaction()"/>
+                  <t t-set="order" t-value="sale_order"/>
+                  <section t-if="payment_tx_id.provider_id.code == 'novalnet'" id="payment-info" class="mt-5">
+                    <h4 class="text-start mt-3">Payment Information</h4>
+                    <hr class="mt-0 mb-1"/>
+                    <t t-set="tx_sudo" t-value="payment_tx_id"/>
+                    <t t-call="payment_novalnet.novalnet_payment_information"/>
+                    <t t-call="payment_novalnet.novalnet_payment_history"/>
+                </section>
+              </t>
+            </xpath>
+        </template>
+
+
+<template id="novalnet_payment_history">
+    <t t-if="any(callback.callback_comment for callback in tx_sudo.novalnet_callback_ids) or tx_sudo.novalnet_transaction_id.novalnet_extension_comment_update">
+        <h4 class="text-start mt-3">Payment History</h4>
+        <hr class="mt-0 mb-1"/>
+
+        <!-- Novalnet Callback Comments -->
+        <t t-if="any(callback.callback_comment for callback in tx_sudo.novalnet_callback_ids)">
+            <ul>
+                <t t-foreach="tx_sudo.novalnet_callback_ids" t-as="callback_id">
+                    <t t-if="callback_id.callback_comment">
+                        <div class="mb-1">
+                            <small class="o_portal_chatter_puslished_date">
+                                <b>Published on <t t-esc="callback_id.current_datetime"/></b>
+                            </small>
+                        </div>
+                        <ul class="mb-1">
+                            <li><t t-esc="callback_id.callback_comment"/></li>
+                        </ul>
+                    </t>
+                </t>
+            </ul>
+        </t>
+
+        <!-- Novalnet Extension Comments -->
+        <t t-if="tx_sudo.novalnet_transaction_id.novalnet_extension_comment_update">
+          <ul>
+            <t t-foreach="tx_sudo.novalnet_transaction_id.novalnet_extension_comment_update.split('\n')" t-as="comment_line">
+                <t t-if="comment_line.startswith('Published on ')">
+                    <div class="mb-1">
+                        <small class="o_portal_chatter_puslished_date">
+                            <b><t t-esc="comment_line"/></b>
+                        </small>
+                    </div>
+                </t>
+                <t t-else="">
+                    <ul class="mb-1">
+                        <li><t t-esc="comment_line"/></li>
+                    </ul>
+                </t>
+            </t>
+          </ul>
+        </t>
+   </t>
+</template>
+
+
+
+<template id="novalnet_payment_information">
+     <t t-set="is_backend" t-value="is_backend or False"/>
+     <t t-if="tx_sudo.novalnet_transaction_id.payment_type == 'GOOGLEPAY'">
+        <p>
+            Your order was successfully processed using Google Pay
+            (<t t-esc="tx_sudo.novalnet_transaction_id.novalnet_wallet_card_details" />).
+         </p>
+       </t>
+
+      <t t-if="tx_sudo.novalnet_transaction_id.payment_type == 'APPLEPAY'">
+        <p>
+            Your order was successfully processed using Apple Pay
+            (<t t-esc="tx_sudo.novalnet_transaction_id.novalnet_wallet_card_details" />).
+         </p>
+       </t>
+
+  <div><b>Payment type: </b><span t-esc="tx_sudo.novalnet_transaction_id.payment_name or ''" class="address-inline"/></div>
+  <div><b>Novalnet transaction ID: </b> <span t-esc="tx_sudo.provider_reference or ''"/></div>
+    <t t-if="tx_sudo.novalnet_transaction_id.novalnet_test_mode == '1'">
+         <p>Test order</p>
+    </t>
+    <t t-if="tx_sudo.state == 'pending' and tx_sudo.novalnet_transaction_id.payment_type in ['GUARANTEED_DIRECT_DEBIT_SEPA', 'INSTALMENT_DIRECT_DEBIT_SEPA']">
+        <p>Your order is under verification and we will soon update you with the order status. Please note that this may take upto 24 hours.</p>
+    </t>
+    <t t-if="tx_sudo.state == 'pending' and tx_sudo.novalnet_transaction_id.payment_type in ['GUARANTEED_INVOICE', 'INSTALMENT_INVOICE']">
+        <p>Your order is being verified. Once confirmed, we will send you our bank details to which the order amount should be transferred. Please note that this may take up to 24 hours</p>
+    </t>
+    <t t-if="tx_sudo.novalnet_transaction_id.zero_amount_check_flag == '1'">
+        <p>This order processed as a zero amount booking</p>
+    </t>
+    <t t-if="tx_sudo.state in ['done','authorized'] or tx_sudo.novalnet_transaction_id.payment_type == 'PREPAYMENT'">
+        <t t-if="tx_sudo.novalnet_transaction_id.novalnet_bank_account">
+
+          <t t-if="tx_sudo.novalnet_transaction_id.payment_type == 'INSTALMENT_INVOICE'">
+            <p>
+                Please transfer the amount of
+                 <strong><t t-esc="tx_sudo.novalnet_transaction_id.novalnet_instalment_information.cycle_amount" /></strong>
+                to the following account
+                <t t-if="tx_sudo.state != 'authorized' and tx_sudo.novalnet_transaction_id.novalnet_due_date">
+                    on or before <t t-esc="tx_sudo.novalnet_transaction_id.novalnet_due_date" />
+                </t>
+            </p>
+          </t>
+
+          <t t-else="">
+            <p>
+                Please transfer the amount of
+                <strong t-field="tx_sudo.amount" t-options="{'widget': 'monetary', 'display_currency': order.currency_id}"/>
+                to the following account
+                <t t-if="tx_sudo.state != 'authorized' and tx_sudo.novalnet_transaction_id.novalnet_due_date">
+                    on or before <t t-esc="tx_sudo.novalnet_transaction_id.novalnet_due_date" />
+                </t>
+
+            </p>
+          </t>
+
+            <ul>
+                <t t-if="tx_sudo.novalnet_transaction_id.novalnet_bank_account.account_holder">
+                     <li> <b>Account holder : </b> <t t-esc="tx_sudo.novalnet_transaction_id.novalnet_bank_account.account_holder" /> </li>
+                </t>
+                <t t-if="tx_sudo.novalnet_transaction_id.novalnet_bank_account.bank_name">
+                    <li> <b>Bank :</b> <t t-esc="tx_sudo.novalnet_transaction_id.novalnet_bank_account.bank_name" /> </li>
+                </t>
+                <t t-if="tx_sudo.novalnet_transaction_id.novalnet_bank_account.bank_place">
+                    <li> <b>Place :</b>  <t t-esc="tx_sudo.novalnet_transaction_id.novalnet_bank_account.bank_place" /> </li>
+                </t>
+                <t t-if="tx_sudo.novalnet_transaction_id.novalnet_bank_account.iban">
+                    <li><b>IBAN :</b> <t t-esc="tx_sudo.novalnet_transaction_id.novalnet_bank_account.iban" /></li>
+                </t>
+                <t t-if="tx_sudo.novalnet_transaction_id.novalnet_bank_account.bic">
+                     <li> <b>BIC :</b>  <t t-esc="tx_sudo.novalnet_transaction_id.novalnet_bank_account.bic" /> </li>
+                </t>
+            </ul>
+            <p> Please use any of the following payment references when transferring the amount. This is necessary to match it with your corresponding order </p>
+            <ul>
+                <li> <b>Payment Reference 1 :</b> <t t-esc="tx_sudo.provider_reference" /> </li>
+                <li> <b>Payment Reference 2 :</b> <t t-esc="tx_sudo.novalnet_transaction_id.payment_reference_two" /> </li>
+            </ul>
+        </t>
+
+        <t t-if="tx_sudo.novalnet_transaction_id.novalnet_instalment_information.current_executed_cycle">
+            <p> Instalment information </p>
+            <ul>
+                <li> <b>Current Instalment Cycle : </b> <t t-esc="tx_sudo.novalnet_transaction_id.novalnet_instalment_information.current_executed_cycle" /> </li>
+                <li> <b>Due instalments :</b> <t t-esc="tx_sudo.novalnet_transaction_id.novalnet_instalment_information.due_instalment" /> </li>
+                <li> <b>Cycle amount :</b>  <t t-esc="tx_sudo.novalnet_transaction_id.novalnet_instalment_information.cycle_amount" /> </li>
+                <li> <b>Next instalment date :</b>  <t t-esc="tx_sudo.novalnet_transaction_id.novalnet_instalment_information.next_instalment_date" /> </li>
+            </ul>
+        </t>
+
+        <t t-if="tx_sudo.novalnet_transaction_id.novalnet_multibanco_payment_reference and tx_sudo.novalnet_transaction_id.novalnet_multibanco_service_supplier_id">
+            <p>Please use the following payment reference details to pay the amount of <strong t-field="tx_sudo.amount" t-options="{'widget': 'monetary', 'display_currency': order.pricelist_id.currency_id}" /> at a Multibanco ATM or through your internet banking</p>
+            <ul>
+              <li> Partner Payment Reference: <t t-out="tx_sudo.novalnet_transaction_id.novalnet_multibanco_payment_reference or ''"/> </li>
+              <li> Entity:  <t t-out="tx_sudo.novalnet_transaction_id.novalnet_multibanco_service_supplier_id or ''"/> </li>
+            </ul>
+        </t>
+        <t t-if="tx_sudo.novalnet_transaction_id.novalnet_nearest_store_ids">
+                            <p> <t t-if="tx_sudo.novalnet_transaction_id.novalnet_due_date"> Slip expiry date (in days) : <t t-esc="tx_sudo.novalnet_transaction_id.novalnet_due_date"/> </t> </p>
+                            <p>Store(s) near to you:</p>
+                            <t t-foreach="tx_sudo.novalnet_transaction_id.novalnet_nearest_store_ids" t-as="novalnet_nearest_store">
+                            <div>
+                                <h6><t t-esc="novalnet_nearest_store.store_name"/></h6>
+                                <h6><t t-esc="novalnet_nearest_store.street"/></h6>
+                                <h6><t t-esc="novalnet_nearest_store.city"/></h6>
+                                <h6><t t-esc="novalnet_nearest_store.zip"/></h6>
+                                <h6><t t-esc="novalnet_nearest_store.country_code"/></h6>
+                            </div>
+                            <br/>
+                            </t>
+                  </t>
+        </t>
+                 <t t-if="tx_sudo.novalnet_transaction_id.payment_type == 'CASHPAYMENT'">
+                         <t t-if="tx_sudo.novalnet_transaction_id.novalnet_cashpayment_token and tx_sudo.novalnet_transaction_id.novalnet_cashpayment_js">
+                             <t t-set="novalnet_cashpayment_js" t-value="tx_sudo.novalnet_transaction_id.novalnet_cashpayment_js"/>
+                             <t t-set="novalnet_cashpayment_token" t-value="tx_sudo.novalnet_transaction_id.novalnet_cashpayment_token"/>
+                               <t t-if="not is_backend">
+                                  <div class="mt-12">
+                                     <script type="text/javascript" t-att-data-token="novalnet_cashpayment_token" class="bz-checkout" id="novalnet_checkout_js" t-att-src="novalnet_cashpayment_js" />
+                                     <button id="barzahlen_button" class="bz-checkout-btn">Pay now with Barzahlen</button>
+                                  </div>
+                                   <br/>
+                                   <br/>
+                                   <br/>
+                             </t>
+                         </t>
+                    </t>
+  </template>
+
+<template id="novalnet_payment_confirmation" inherit_id="website_sale.confirmation">
+    <xpath expr="//t[@t-call='website_sale.payment_confirmation_status']" position="after">
+        <t t-if="tx_sudo.provider_code == 'novalnet'">
+            <div class="card mt-3">
+                <div class="card-body">
+                     <t t-call="payment_novalnet.novalnet_payment_information"/>
+                     <t t-call="payment_novalnet.novalnet_payment_history"/>
+                </div>
+            </div>
+        </t>
+    </xpath>
+</template>
+
+
+    <template id="payment_novalnet.payment_method_form" inherit_id="payment.method_form">
+        <xpath expr="//p[@name='o_payment_secured_by']" position="attributes">
+            <attribute name="class" separator=" " add="d-none"/>
+        </xpath>
+    </template>
+
+    <template id="novalnet_redirect_form">
+      <form t-att-action="redirect_url" method="post">
+      </form>
+  </template>
+
+
+    <template id="inline_form" name="Novalnet Payment inline form" inherit_id="payment.form">
+      <xpath expr="." position="inside">
+          <script src="https://cdn.novalnet.de/js/v2/NovalnetUtility.js" />
+          <script type="text/javascript" src="https://cdn.novalnet.de/js/pv13/checkout.js" />
+      </xpath>
+      <xpath expr="//div[@id= 'o_payment_methods']/ul/t/li[1]" position="replace">
+          <li name="o_payment_option" class="list-group-item d-flex flex-column gap-2 py-3 o_outline">
+                <t t-set="provider_sudo" t-value="pm_sudo.provider_ids.filtered(lambda p: p in providers_sudo)[:1]"/>
+
+                <t t-if="provider_sudo.code == 'novalnet'">
+
+                    <input t-attf-id="o_payment_method_{{pm_sudo.id}}"
+                           name="o_payment_radio"
+                           type="radio"
+                           t-att-checked="is_selected"
+                           class="form-check-input position-absolute d-none"
+                           data-payment-option-type="payment_method"
+                           t-att-data-payment-option-id="pm_sudo.id"
+                           t-att-data-payment-method-code="pm_sudo.code"
+                           t-att-data-provider-id="provider_sudo.id"
+                           t-att-data-provider-code="provider_sudo._get_code()"
+                           t-attf-data-provider-radio="o_payment_method_{{provider_sudo._get_code()}}"
+                           t-att-data-provider-state="provider_sudo.state"
+                    />
+                    <t t-if="sale_order">
+                            <t t-set="order" t-value="sale_order"/>
+                    </t>
+                    <t t-if="reference_prefix">
+                       <t t-set="get_order" t-value="env['sale.order'].sudo().search([('name', '=', reference_prefix)], limit=1)"/>
+                        <t t-if="len(get_order) > 0">
+                              <t t-set="order" t-value="get_order"/>
+                        </t>
+                    </t>
+
+                    <t t-if="invoice">
+                        <t t-set="invoice" t-value="invoice"/>
+                    </t>
+
+
+                <t t-if="order">
+                  <t t-set="line_items" t-value="[]"/>
+
+                  <!-- Product line items and discounts -->
+                  <t t-foreach="order.order_line" t-as="line">
+                    <!-- Regular line item -->
+                    <t t-set="line_items" t-value="line_items + [{
+                        'label': line.name,
+                        'type': 'LINE_ITEM',
+                        'amount': round((line.price_unit * line.product_uom_qty) * 100)
+                    }]"/>
+
+
+                      <t t-if="line.discount > 0">
+                            <t t-set="price_subtotal_before_discount" t-value="line.price_unit * line.product_uom_qty / (1 + (line.tax_id.amount / 100))" />
+                            <t t-set="discount_amount" t-value="round((price_subtotal_before_discount - line.price_subtotal) * 100)"/>
+                            <t t-set="line_items" t-value="line_items + [{
+                                'label': 'Discount - ' + line.name,
+                                'type': 'DISCOUNT',
+                                'amount': -discount_amount
+                            }]"/>
+                      </t>
+                  </t>
+
+                  <t t-if="line.discount > 0">
+                      <t t-set="price_subtotal_before_discount" t-value="line.price_unit * line.product_uom_qty / (1 + (line.tax_id.amount / 100))" />
+                      <t t-set="discount_amount" t-value="round((price_subtotal_before_discount - line.price_subtotal) * 100)"/>
+                      <t t-set="line_items" t-value="line_items + [{
+                        'label': 'Discount - ' + line.name,
+                        'type': 'DISCOUNT',
+                        'amount': -discount_amount
+                      }]"/>
+                    </t>
+
+                  <!-- Subtotal -->
+                <t t-set="line_items" t-value="line_items + [{
+                        'label': 'Subtotal',
+                        'type': 'SUBTOTAL',
+                        'amount': round(order.amount_total * 100)
+                    }]"/>
+
+                    <t t-set="exclude_tax_amount" t-value="sum(line.price_tax for line in order.order_line if not line.tax_id.filtered(lambda t: t.price_include))"/>
+                    <t t-set="line_items" t-value="line_items + [{
+                        'label': 'Estimated Tax',
+                        'type': 'TAX',
+                        'amount': round(exclude_tax_amount * 100)
+                    }]"/>
+
+
+                  <div id="novalnet_payment_data_line_items"
+                       t-att-data-line-items="json.dumps(line_items)"
+                       style="display:none"/>
+                </t>
+
+                <t t-if="invoice">
+                  <t t-set="line_items" t-value="[]"/>
+
+                  <!-- Product line items and discounts for invoice -->
+                  <t t-foreach="invoice.invoice_line_ids" t-as="line">
+                    <!-- Regular line item -->
+                    <t t-set="line_items" t-value="line_items + [{
+                        'label': line.name,
+                        'type': 'LINE_ITEM',
+                        'amount': round((line.price_unit * line.quantity) * 100)
+                    }]"/>
+
+                    <!-- Discount for this line if applicable -->
+                    <t t-if="line.discount > 0">
+                      <t t-set="discount_amount" t-value="round(((line.price_unit * line.quantity) - line.price_subtotal) * 100)"/>
+                      <t t-set="line_items" t-value="line_items + [{
+                          'label': 'Discount - ' + line.name,
+                          'type': 'DISCOUNT',
+                          'amount': -discount_amount
+                      }]"/>
+                    </t>
+                  </t>
+
+                  <!-- Subtotal -->
+                 <t t-set="line_items" t-value="line_items + [{
+                    'label': 'Subtotal',
+                    'type': 'SUBTOTAL',
+                    'amount': round(invoice.amount_total * 100)
+                }]"/>
+
+                  <!-- Tax -->
+             <t t-set="exclude_tax_amount" t-value="0"/>
+                    <t t-foreach="invoice.invoice_line_ids" t-as="line">
+                        <t t-set="exclude_tax_amount" t-value="exclude_tax_amount + sum(tax.amount for tax in line.tax_ids if not tax.price_include) * line.price_subtotal / 100"/>
+                    </t>
+                    <t t-set="line_items" t-value="line_items + [{
+                        'label': 'Tax',
+                        'type': 'TAX',
+                        'amount': round(exclude_tax_amount * 100)
+                    }]"/>
+
+
+                  <div id="novalnet_invoice_data_line_items"
+                       t-att-data-line-items="json.dumps(line_items)"
+                       style="display:none"/>
+                </t>
+
+
+
+
+
+                    <t t-set="redirect_url" t-value="provider_sudo._novalnet_load_payment_page(order , amount, currency, request.env.user.partner_id , invoice)"/>
+                         <iframe  style = "width:100%;border: 0;" id = "novalnet_iframe" t-att-src = "redirect_url" allow = "payment" referrerPolicy="origin" />
+                </t>
+                <t t-else="1">
+                    <t t-call="payment.method_form">
+                                    <t t-set="is_selected" t-value="pm_sudo.id == selected_method_id"/>
+                    </t>
+                </t>
+          </li>
+      </xpath>
+
+    </template>
+
+
+
+    <template id="payment_details">
+        <div class="row gap2 gap-md-0">
+            <input name="provider_id" type="hidden" id="provider_id" t-att-value="id"/>
+            <input name="partner_id" type="hidden" t-att-value="partner_id"/>
+            <input name="noval_id" type="hidden" t-att-value="noval_id"/>
+            <input name="novalnet_redirect_url" type="hidden" t-att-value="novalnet_redirect_url"/>
+            <div class="col-12 col-md mt-0 mb-0">
+                <label for="customer_input" class="mt-0">
+                    <small>Payment Details (test data)</small>
+                </label>
+                <input type="text"
+                       name="customer_input"
+                       id="customer_input"
+                       class="form-control"
+                       placeholder="XXXX XXXX XXXX XXXX"/>
+            </div>
+            <div class="col-12 col-md mb-0">
+                <label for="simulated_payment_state" class="mt-0 text-muted">
+                    <small>Payment Status</small>
+                </label>
+                <select id="simulated_payment_state" class="form-select">
+                    <option value="done" title="Successful payment">
+                        Successful
+                    </option>
+                    <option value="pending" title="Payment processing">
+                        Pending
+                    </option>
+                    <option value="cancel" title="Payment canceled by customer">
+                        Canceled
+                    </option>
+                    <option value="error" title="Processing error">
+                        Error
+                    </option>
+                </select>
+            </div>
+        </div>
+    </template>
+
+    <template id="payment_token_form_inherit" inherit_id="payment.token_form">
+        <xpath expr="//label[@t-out='token_sudo.payment_method_id.name']" position="replace">
+            <label class="o_payment_option_label text-break"
+                   t-attf-for="o_payment_token_{{token_sudo.id}}"
+                   t-out="token_sudo.provider_id._get_code() == 'novalnet' and token_sudo.novalnet_payment_type or token_sudo.payment_method_id.name" />
+        </xpath>
+    </template>
+
+<record id="novalnet_sale_order_backend_view" model="ir.ui.view">
+    <field name="name">sale.order.form.novalnet</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="arch" type="xml">
+        <xpath expr="//field[@name='note']" position="before">
+            <field name="novalnet_backend_order_info_html" readonly="1" widget="html"/>
+        </xpath>
+    </field>
+</record>
+
+<record id="view_move_form_novalnet_inherit" model="ir.ui.view">
+    <field name="name">account.move.form.novalnet</field>
+    <field name="model">account.move</field>
+    <field name="inherit_id" ref="account.view_move_form"/>
+    <field name="arch" type="xml">
+        <xpath expr="//field[@name='narration']" position="before">
+            <group class="o_field_widget o_field_html col-lg-6">
+                 <field name="novalnet_invoice_info_html" readonly="1" widget="html"/>
+            </group>
+        </xpath>
+    </field>
+</record>
+
+<template id="report_invoice_document_novalnet" inherit_id="account.report_invoice_document">
+    <xpath expr="//div[@name='comment']" position="before">
+        <div class="novalnet-invoice-info">
+            <h3>Payment Information:</h3>
+            <t t-raw="o.novalnet_invoice_info_html"/>
+        </div>
+    </xpath>
+</template>
+
+<template id="sale_report_inherit_novalnet_comments" inherit_id="sale.report_saleorder_document">
+      <xpath expr="//span[@t-field='doc.note']" position="before">
+        <div t-if="doc.novalnet_backend_order_info_html">
+            <strong>Payment Information:</strong>
+            <div t-raw="doc.novalnet_backend_order_info_html"/>
+        </div>
+    </xpath>
+</template>
+
+</odoo>

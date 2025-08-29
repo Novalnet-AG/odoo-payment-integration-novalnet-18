@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Inherit the existing payment provider form view to add our custom fields -->
+    <record id="payment_provider_form" model="ir.ui.view">
+        <field name="name">Novalnet Form</field>
+        <field name="model">payment.provider</field>
+        <field name="inherit_id" ref="payment.payment_provider_form"/>
+        <field name="arch" type="xml">
+              <group name="provider_credentials" position="inside">
+                <group invisible="code != 'novalnet'" name="novalnet_credentials">
+                    <separator string=" Novalnet API Configuration" colspan="4" />
+                    <field name="novalnet_product_activation_key" placeholder="Enter Product Activation Key" required="code == 'novalnet' and state != 'disabled'"/>
+                    <field name="novalnet_payment_access_key" placeholder="Enter Payment Access Key" required="code == 'novalnet' and state != 'disabled'" />
+                    <h6/>
+                    <small class="text-muted" >
+                      <b><button name="get_novalnet_merchant_details" icon="fa-arrow-right" type="object" string="Get access details" class="btn-link"/></b>
+                    </small>
+                    <field name="hide_novalnet_tariff" invisible="1"/>
+                    <field name="novalnet_traiff" invisible="not hide_novalnet_tariff" options="{'reload_on_button': True}" />
+                </group>
+            </group>
+            <group name="provider_config" position="after" >
+                 <group string="Notification / Webhook URL Setup" invisible="code != 'novalnet'">
+                       <field name="novalnet_allow_manual_testing"/>
+                       <field name="novalnet_webhook_url"/>
+                       <button string="Configure" type="object" name="novalnet_webhook_config_btn"  class="btn btn-primary"/>
+                       <h6/>
+                       <field name="novalnet_webhook_send_mail" placeholder="Send e-mail to"/>
+                </group>
+            </group>
+        </field>
+    </record>
+</odoo>
