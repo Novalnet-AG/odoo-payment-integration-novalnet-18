@@ -18,7 +18,7 @@
         'data/payment_method_data.xml',
         'data/payment_provider_data.xml',
     ],
-    'images': ['static/description/icon.png'],
+    'images': ['static/description/cover.png','static/description/icon.png'],
     'post_init_hook': 'post_init_hook',
     'uninstall_hook': 'uninstall_hook',
     'application': False,
